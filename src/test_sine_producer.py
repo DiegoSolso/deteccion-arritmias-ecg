@@ -1,3 +1,16 @@
+"""
+ECG Data Producer - Simulador de ECG en Tiempo Real
+
+Este módulo lee un archivo de señal ECG (en formato Parquet) y lo transmite
+a través de Apache Kafka, simulando un dispositivo de ECG en tiempo real.
+
+La señal se transmite punto por punto a la frecuencia de muestreo original (360Hz),
+permitiendo que el consumidor (plotter) procese y visualice la señal como si
+fuera un stream en tiempo real.
+
+Autor: Proyecto Big Data - Universidad
+"""
+
 import time
 import json
 import numpy as np
@@ -9,24 +22,39 @@ import os
 KAFKA_TOPIC = "ecg-raw-signal"
 KAFKA_SERVER = "localhost:9092"
 
-# RUTA A TU ARCHIVO
+# RUTA AL ARCHIVO DE DATOS ECG
+# Este archivo debe ser generado por el notebook de entrenamiento
 PARQUET_FILE = "src/100.parquet" 
 
 # CONFIGURACIÓN DE STREAMING PUNTO A PUNTO
-FS = 360.0        # Frecuencia de muestreo (Hz)
+FS = 360.0        # Frecuencia de muestreo (Hz) - MIT-BIH estándar
 SEND_RATE = 1.0 / FS  # Intervalo entre envíos (aprox 0.0027s)
 
 def load_data(filepath):
-    """Carga el parquet y prepara los arrays de señal y etiquetas."""
+    """
+    Carga el archivo Parquet y prepara los arrays de señal y etiquetas.
+    
+    Args:
+        filepath: Ruta al archivo .parquet con la señal ECG
+        
+    Returns:
+        signal: Array numpy con los valores de la señal
+        labels: Array con las anotaciones/etiquetas de cada punto
+    """
     if not os.path.exists(filepath):
-        print(f"ERROR: No se encuentra el archivo: {filepath}")
+        print(f"❌ ERROR: No se encuentra el archivo: {filepath}")
+        print(f"   Asegúrate de ejecutar primero el notebook de entrenamiento")
+        print(f"   para generar los archivos de datos.")
         return None, None
         
-    print(f"Cargando archivo: {filepath} ...")
+    print(f"📂 Cargando archivo: {filepath} ...")
     df = pd.read_parquet(filepath)
     
-    # Asumimos que la PRIMERA columna es la señal
-    signal_col = df.columns[0]
+    # Asumimos que la PRIMERA columna es la señal (o buscar 'signal')
+    if 'signal' in df.columns:
+        signal_col = 'signal'
+    else:
+        signal_col = df.columns[0]
     
     if 'annotation' in df.columns:
         df['annotation'] = df['annotation'].fillna('None')
@@ -36,32 +64,51 @@ def load_data(filepath):
         
     signal = df[signal_col].values
     
-    print(f"Datos cargados: {len(signal)} muestras. Frecuencia simulada: {FS}Hz")
+    print(f"✅ Datos cargados: {len(signal):,} muestras")
+    print(f"   Frecuencia de transmisión: {FS}Hz")
+    print(f"   Duración total: {len(signal)/FS:.1f} segundos")
     return signal, labels
 
 def start_ecg_producer():
-    print(f"--- ECG SINGLE-POINT PRODUCER ---")
-    print(f"Transmitiendo a {FS} Hz (1 dato a la vez) hacia: {KAFKA_TOPIC}")
+    """
+    Inicia el productor de ECG que transmite la señal punto por punto.
+    
+    El productor:
+    1. Lee un archivo de señal ECG (Parquet)
+    2. Transmite cada punto a través de Kafka a 360Hz
+    3. Incluye las etiquetas reales (ocultas) para validación
+    4. Reinicia automáticamente al llegar al final del archivo
+    """
+    print("\n" + "="*60)
+    print("🫀 ECG SINGLE-POINT PRODUCER")
+    print("="*60)
+    print(f"\n📡 Transmitiendo a {FS} Hz hacia: {KAFKA_TOPIC}")
     
     # 1. Cargar Datos
     signal, labels = load_data(PARQUET_FILE)
-    if signal is None: return
+    if signal is None: 
+        return
 
     # 2. Configurar Kafka
+    print(f"\n🔌 Conectando a Kafka: {KAFKA_SERVER}...")
     producer = KafkaProducer(
         bootstrap_servers=[KAFKA_SERVER],
         value_serializer=lambda x: json.dumps(x).encode('utf-8')
     )
+    print("✅ Conectado a Kafka")
 
     sequence = 0
     idx = 0
     total_samples = len(signal)
+    start_time = time.time()
 
+    print(f"\n🚀 Iniciando transmisión... (Ctrl+C para detener)\n")
+    
     try:
         while True:
             # 3. Reinicio de bucle si llegamos al final
             if idx >= total_samples:
-                print(">>> Fin del archivo. Reiniciando bucle... <<<")
+                print("\n>>> Fin del archivo. Reiniciando bucle... <<<\n")
                 idx = 0
             
             # 4. Extraer UN solo dato
@@ -71,8 +118,7 @@ def start_ecg_producer():
             # Etiqueta (si es 'None', mandamos 'Normal' para visualizar)
             label_to_send = label_val if label_val != 'None' else "Normal"
             
-            # IMPORTANTE: Enviamos como lista [val] para mantener compatibilidad
-            # con esquemas que esperen Array, aunque sea de longitud 1.
+            # Enviamos como lista [val] para mantener compatibilidad
             raw_point = [val]
 
             # 5. Crear Mensaje
@@ -81,15 +127,16 @@ def start_ecg_producer():
                 "timestamp": time.time(),
                 "sequence_id": sequence,
                 "hidden_label": label_to_send,
-                "raw_signal_chunk": raw_point # Ahora es un "chunk" de 1 elemento
+                "raw_signal_chunk": raw_point
             }
 
             # 6. Enviar
             producer.send(KAFKA_TOPIC, value=message)
             
-            # Solo imprimimos info cada 1 segundo (360 muestras) para no saturar la consola
+            # Solo imprimimos info cada 1 segundo (360 muestras)
             if sequence % 360 == 0:
-                print(f"Stream {FS}Hz | Seq {sequence}: Dato {val:.3f} enviado. (Etiqueta: {label_to_send})")
+                elapsed = time.time() - start_time
+                print(f"⏱️ {elapsed:.0f}s | Seq {sequence:>6}: Val={val:>7.3f} | Label: {label_to_send}")
             
             # Avanzar
             idx += 1
@@ -99,7 +146,12 @@ def start_ecg_producer():
             time.sleep(SEND_RATE)
 
     except KeyboardInterrupt:
-        print("\nTransmisión detenida.")
+        elapsed = time.time() - start_time
+        print(f"\n\n📊 RESUMEN DE TRANSMISIÓN:")
+        print(f"   Tiempo total: {elapsed:.1f} segundos")
+        print(f"   Puntos transmitidos: {sequence:,}")
+        print(f"   Tasa efectiva: {sequence/elapsed:.1f} Hz")
+        print("\n✅ Transmisión detenida.")
     finally:
         producer.close()
 

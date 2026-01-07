@@ -21,7 +21,11 @@ import time
 # --- CONFIGURACIÓN ---
 KAFKA_TOPIC = "ecg-raw-signal"
 KAFKA_SERVER = "localhost:9092"
-MODEL_PATH = "models/ecg_forecaster.pth"
+
+# Ruta al modelo entrenado (relativa al directorio raíz del proyecto)
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR = os.path.dirname(SCRIPT_DIR)
+MODEL_PATH = os.path.join(PROJECT_DIR, "models", "ecg_forecaster.pth")
 
 # Parámetros de Ventana y Detección
 FS = 360
@@ -38,6 +42,11 @@ INPUT_WINDOW = 1440    # 4 segundos de entrada (360 * 4)
 OUTPUT_WINDOW = 180    # 0.5 segundos de salida (360 * 0.5)
 MODEL_WINDOW = 360     # Ventana para visualización del latido
 HALF_WINDOW = 180      # Punto donde alineamos el pico (centro)
+
+# Visualización de anomalías
+# Factor de escala para convertir MSE en porcentaje visual (0-100)
+# Calculado como 100 / umbral típico para que el umbral esté al 50% de la barra
+ANOMALY_VISUAL_SCALE = 50.0  # Se ajustará dinámicamente basado en el umbral del modelo
 
 
 class LSTMAutoencoder(nn.Module):
@@ -134,24 +143,29 @@ def load_model(model_path):
 
 
 def normalize(data, min_val, max_val):
-    """Normaliza datos al rango [0, 1]"""
-    return (data - min_val) / (max_val - min_val)
+    """Normaliza datos al rango [0, 1] con protección contra división por cero."""
+    range_val = max_val - min_val
+    if range_val == 0:
+        return np.zeros_like(data)
+    return (data - min_val) / range_val
 
 
-def predict_anomaly(model, signal_window, threshold, scaler_params, device='cpu'):
+def predict_anomaly(model, signal_window, future_signal, threshold, scaler_params, device='cpu'):
     """
-    Predice si un segmento de señal contiene una anomalía.
+    Predice si un segmento de señal contiene una anomalía comparando
+    la predicción del modelo con la señal real futura.
     
     Args:
         model: Modelo LSTM Autoencoder
         signal_window: Array con la señal de entrada (INPUT_WINDOW muestras)
+        future_signal: Array con la señal real futura para comparar (OUTPUT_WINDOW muestras)
         threshold: Umbral para clasificar como anomalía
         scaler_params: Parámetros de normalización
         device: Dispositivo de cómputo
         
     Returns:
         is_anomaly: bool indicando si es anomalía
-        mse: Error cuadrático medio
+        mse: Error cuadrático medio entre predicción y señal real
         prediction: Señal predicha
     """
     if model is None:
@@ -167,10 +181,13 @@ def predict_anomaly(model, signal_window, threshold, scaler_params, device='cpu'
     with torch.no_grad():
         prediction = model(X_tensor).cpu().numpy()[0]
     
-    # Calcular MSE (en el espacio normalizado)
-    # Nota: En producción deberíamos comparar con la señal real futura
-    # Aquí usamos solo la predicción para fines de demostración
-    mse = np.mean(prediction ** 2)  # Placeholder - en producción comparar con señal real
+    # Si tenemos señal futura real, calcular MSE de reconstrucción
+    if future_signal is not None and len(future_signal) >= len(prediction):
+        y_norm = normalize(future_signal[:len(prediction)], scaler_params['y_min'], scaler_params['y_max'])
+        mse = np.mean((prediction - y_norm) ** 2)
+    else:
+        # Fallback: usar varianza de predicción como proxy (menos preciso)
+        mse = np.var(prediction)
     
     is_anomaly = mse > threshold
     
@@ -334,14 +351,17 @@ def start_smart_monitor():
                         line_zoom.set_data(np.arange(MODEL_WINDOW), beat_window)
                         
                         # --- PREDICCIÓN DEL MODELO ---
-                        if model_available and len(full_history) >= INPUT_WINDOW:
-                            input_window = np.array(full_history[-INPUT_WINDOW:])
+                        if model_available and len(full_history) >= INPUT_WINDOW + OUTPUT_WINDOW:
+                            input_window = np.array(full_history[-(INPUT_WINDOW + OUTPUT_WINDOW):-OUTPUT_WINDOW])
+                            future_window = np.array(full_history[-OUTPUT_WINDOW:])
                             is_anomaly, mse, _ = predict_anomaly(
-                                model, input_window, threshold, scaler_params
+                                model, input_window, future_window, threshold, scaler_params
                             )
                             
                             # Actualizar indicador visual
-                            anomaly_score = min(100, mse * 100000)  # Escalar para visualización
+                            # Escalar MSE a porcentaje (0-100) basado en el umbral
+                            # El umbral corresponde al 50% de la barra
+                            anomaly_score = min(100, (mse / threshold) * ANOMALY_VISUAL_SCALE)
                             if status_bar is not None:
                                 status_bar[0].set_width(anomaly_score)
                                 if is_anomaly:

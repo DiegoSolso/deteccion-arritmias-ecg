@@ -24,7 +24,9 @@ KAFKA_SERVER = "localhost:9092"
 
 # RUTA AL ARCHIVO DE DATOS ECG
 # Este archivo debe ser generado por el notebook de entrenamiento
-PARQUET_FILE = "src/100.parquet" 
+# La ruta se resuelve relativa al directorio del script
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PARQUET_FILE = os.path.join(SCRIPT_DIR, "100.parquet")
 
 # CONFIGURACIÓN DE STREAMING PUNTO A PUNTO
 FS = 360.0        # Frecuencia de muestreo (Hz) - MIT-BIH estándar

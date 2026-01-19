@@ -26,7 +26,7 @@ KAFKA_SERVER = "localhost:9092"
 # Este archivo debe ser generado por el notebook de entrenamiento
 # La ruta se resuelve relativa al directorio del script
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-PARQUET_FILE = os.path.join(SCRIPT_DIR, "100.parquet")
+PARQUET_FILE = os.path.join(SCRIPT_DIR, "data", "individual_records", "patient_200.parquet")
 
 # CONFIGURACIÓN DE STREAMING PUNTO A PUNTO
 FS = 360.0        # Frecuencia de muestreo (Hz) - MIT-BIH estándar

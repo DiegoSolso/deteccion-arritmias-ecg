@@ -30,8 +30,6 @@ env/
 .venv/
 
 # PyTorch models (mantener solo .gitkeep)
-models/*.pth
-models/*.pkl
 !models/.gitkeep
 
 # Datasets descargados

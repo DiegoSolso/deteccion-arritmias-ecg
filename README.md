@@ -11,79 +11,111 @@ Este proyecto implementa un sistema de detección de arritmias cardíacas en tie
 
 ## 📁 Estructura del Proyecto
 
+
 ```
 big-data-final/
-├── exploration_and_training.ipynb  # Notebook principal de exploración y entrenamiento
 ├── src/
 │   ├── test_sine_producer.py       # Productor: simula ECG en tiempo real via Kafka
-│   ├── test_sine_plotter.py        # Consumidor: visualiza y detecta arritmias
-│   └── 100.parquet                 # Datos de ejemplo (generado por el notebook)
+│   ├── test_sine_plotter.py        # Monitor: visualiza y detecta arritmias en tiempo real
+│   ├── 100.parquet                 # Datos de ejemplo
+│   └── ... (otros scripts o archivos auxiliares)
 ├── models/
-│   ├── ecg_forecaster.pth          # Modelo entrenado (generado por el notebook)
-│   └── scalers.pkl                 # Parámetros de normalización
+│   ├── fade_ecg_model_base.pth     # Modelo entrenado
+│   ├── scaler_x.pkl                # Parámetros de normalización X
+│   └── scaler_y.pkl                # Parámetros de normalización Y
 └── README.md
 ```
 
-## 🚀 Guía de Uso
+# 🫀 Real-Time ECG Arrhythmia Detection System
 
-### 1. Ejecutar el Notebook
+## Final Project - Big Data
 
-Abre `exploration_and_training.ipynb` en Google Colab o Jupyter y ejecuta todas las celdas para:
+This project implements a real-time cardiac arrhythmia detection system using:
 
-1. Descargar el dataset MIT-BIH de PhysioNet
-2. Explorar y visualizar las señales ECG
-3. Preprocesar y segmentar los datos
-4. Entrenar el modelo LSTM Autoencoder
-5. Evaluar el rendimiento
-6. Exportar el modelo para uso en streaming
+- **Dataset**: MIT-BIH Arrhythmia Database (PhysioNet)
+- **Model**: LSTM Autoencoder for anomaly detection
+- **Streaming**: Apache Kafka for real-time data transmission
+- **Visualization**: Real-time monitor with matplotlib
 
-### 2. Configurar Kafka (Local)
+## 📁 Project Structure
+
+```
+big-data-final/
+├── src/
+│   ├── test_sine_producer.py       # Producer: simulates real-time ECG via Kafka
+│   ├── test_sine_plotter.py        # Monitor: visualizes and detects arrhythmias in real time
+│   ├── 100.parquet                 # Example data
+│   └── ... (other scripts or auxiliary files)
+├── models/
+│   ├── fade_ecg_model_base.pth     # Trained model
+│   ├── scaler_x.pkl                # Normalization parameters X
+│   └── scaler_y.pkl                # Normalization parameters Y
+└── README.md
+```
+
+## 🚀 Usage Guide
+
+### 1. Configure Kafka (Local)
 
 ```bash
-# Iniciar Zookeeper
+# Start Zookeeper
 bin/zookeeper-server-start.sh config/zookeeper.properties
 
-# Iniciar Kafka
+# Start Kafka
 bin/kafka-server-start.sh config/server.properties
 
-# Crear topic
+# Create topic
 bin/kafka-topics.sh --create --topic ecg-raw-signal --bootstrap-server localhost:9092
 ```
 
-### 3. Ejecutar el Sistema
+### 2. Run the System Scripts
 
-Terminal 1 - Productor:
+Open two terminals in the project root folder and run the following commands:
+
+**Terminal 1 - Signal Producer (ECG simulation):**
 ```bash
 cd src
 python test_sine_producer.py
 ```
 
-Terminal 2 - Monitor/Plotter:
+**Terminal 2 - Monitor/Plotter (arrhythmia detection and visualization):**
 ```bash
 cd src
 python test_sine_plotter.py
 ```
 
-## 📊 Metodología
+**Other scripts in `src/`**
 
-### Prevención de Data Leakage
+If you add new scripts for processing, analysis, or utilities, run them in the same way:
+```bash
+cd src
+python your_script_name.py
+```
 
-El proyecto implementa una división a **nivel de paciente** para evitar data leakage:
+**Notes:**
+- Make sure you have the models and scalers in the `models/` folder with the correct names (`fade_ecg_model_base.pth`, `scaler_x.pkl`, `scaler_y.pkl`).
+- If you use additional data files, place them in the appropriate folder and adjust the paths in the scripts as needed.
 
-- Los pacientes de entrenamiento son completamente diferentes de los de test
-- El modelo nunca ve latidos del mismo paciente en train y test
-- Esto refleja mejor el rendimiento real en pacientes nuevos
+## 📊 Methodology
 
-### Detección de Anomalías
+### Data Leakage Prevention
 
-El sistema utiliza un enfoque de **reconstrucción**:
+The project implements a **patient-level split** to avoid data leakage:
 
-1. El autoencoder se entrena solo con latidos normales
-2. Aprende a predecir el patrón futuro del ECG
-3. Las anomalías producen mayor error de reconstrucción
-4. Un umbral calibrado clasifica normal vs arritmia
+- Training and test patients are completely different
+- The model never sees beats from the same patient in both train and test
+- This better reflects real-world performance on new patients
 
-## 📚 Dependencias
+### Anomaly Detection
+
+The system uses a **reconstruction-based** approach:
+
+1. The autoencoder is trained only with normal beats
+2. It learns to predict the future ECG pattern
+3. Anomalies produce higher reconstruction error
+4. A calibrated threshold classifies normal vs arrhythmia
+
+## 📚 Dependencies
 
 ```
 numpy
@@ -97,10 +129,10 @@ kafka-python
 pyarrow
 ```
 
-## 👥 Autores
+## 👥 Authors
 
-Proyecto desarrollado para el curso de Big Data - Universidad
+Developed for the Big Data course - University
 
-## 📝 Licencia
+## 📝 License
 
-Este proyecto es solo para fines educativos.
+This project is for educational purposes only.

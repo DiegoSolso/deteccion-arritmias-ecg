@@ -118,7 +118,7 @@ def start_ecg_producer():
             label_val = labels[idx]
             
             # Etiqueta (si es 'None', mandamos 'Normal' para visualizar)
-            label_to_send = label_val if label_val != 'None' else "Normal"
+            label_to_send = label_val
             
             # Enviamos como lista [val] para mantener compatibilidad
             raw_point = [val]
@@ -135,11 +135,11 @@ def start_ecg_producer():
             # 6. Enviar
             producer.send(KAFKA_TOPIC, value=message)
             
-            # Solo imprimimos info cada 1 segundo (360 muestras)
-            if sequence % 360 == 0:
-                elapsed = time.time() - start_time
-                print(f"⏱️ {elapsed:.0f}s | Seq {sequence:>6}: Val={val:>7.3f} | Label: {label_to_send}")
-            
+            # 7. Solo imprimimos si etiqueta != 'None' (para no saturar la consola)
+            if label_val != 'None':
+                print(f"📨 Enviado punto #{sequence:,}: Value={val:.3f}, Label={label_val}"
+                      f" (Index: {idx}/{total_samples})"
+                    )
             # Avanzar
             idx += 1
             sequence += 1

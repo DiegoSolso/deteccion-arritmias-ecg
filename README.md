@@ -1,31 +1,3 @@
-# 🫀 Sistema de Detección de Arritmias en ECG
-
-## Proyecto Final - Big Data
-
-Este proyecto implementa un sistema de detección de arritmias cardíacas en tiempo real utilizando:
-
-- **Dataset**: MIT-BIH Arrhythmia Database (PhysioNet)
-- **Modelo**: LSTM Autoencoder para detección de anomalías
-- **Streaming**: Apache Kafka para transmisión en tiempo real
-- **Visualización**: Monitor en tiempo real con matplotlib
-
-## 📁 Estructura del Proyecto
-
-
-```
-big-data-final/
-├── src/
-│   ├── test_sine_producer.py       # Productor: simula ECG en tiempo real via Kafka
-│   ├── test_sine_plotter.py        # Monitor: visualiza y detecta arritmias en tiempo real
-│   ├── 100.parquet                 # Datos de ejemplo
-│   └── ... (otros scripts o archivos auxiliares)
-├── models/
-│   ├── fade_ecg_model_base.pth     # Modelo entrenado
-│   ├── scaler_x.pkl                # Parámetros de normalización X
-│   └── scaler_y.pkl                # Parámetros de normalización Y
-└── README.md
-```
-
 # 🫀 Real-Time ECG Arrhythmia Detection System
 
 ## Final Project - Big Data
@@ -43,7 +15,7 @@ This project implements a real-time cardiac arrhythmia detection system using:
 big-data-final/
 ├── src/
 │   ├── test_sine_producer.py       # Producer: simulates real-time ECG via Kafka
-│   ├── test_sine_plotter.py        # Monitor: visualizes and detects arrhythmias in real time
+│   ├── test_sine_plotter.py        # Monitor: visualizes and detects arrhythmias in realtime
 │   ├── 100.parquet                 # Example data
 │   └── ... (other scripts or auxiliary files)
 ├── models/

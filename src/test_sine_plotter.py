@@ -2,8 +2,8 @@
 ECG Real-time Monitor with Arrhythmia Detection
 
 Este módulo recibe señales ECG a través de Kafka y las visualiza en tiempo real.
-Utiliza un modelo LSTM Autoencoder entrenado para detectar arritmias basándose
-en el error de reconstrucción.
+Utiliza un modelo convolucional que predice la continuación de cada latido y
+detecta arritmias a partir del error de predicción.
 
 Autor: Proyecto Big Data - Universidad
 """

@@ -1,110 +1,58 @@
-# 🫀 Real-Time ECG Arrhythmia Detection System
+# Detección de arritmias en tiempo real a partir del ECG
 
-## Final Project - Big Data
+Proyecto final de la asignatura de Big Data del Máster Universitario en Sistemas Inteligentes (Universitat Jaume I, 2026), hecho en pareja con [gtognola](https://github.com/gtognola).
 
-This project implements a real-time cardiac arrhythmia detection system using:
+Un productor envía por Kafka la señal de un electrocardiograma como si llegara de un monitor, a 360 muestras por segundo. Un consumidor la recibe, predice cómo debería continuar cada latido y marca como posible arritmia el que se aleja demasiado de la predicción.
 
-- **Dataset**: MIT-BIH Arrhythmia Database (PhysioNet)
-- **Model**: LSTM Autoencoder for anomaly detection
-- **Streaming**: Apache Kafka for real-time data transmission
-- **Visualization**: Real-time monitor with matplotlib
+## Cómo funciona
 
-## 📁 Project Structure
+- **Modelo:** una red convolucional de tipo codificador-decodificador, en PyTorch, que predice los 0,5 segundos siguientes de señal a partir de los 4 anteriores. Sigue el enfoque de [FADE](https://arxiv.org/abs/2502.07389) (Ruiz-Barroso et al., 2025).
+- **Entrenamiento:** el modelo base se entrenó solo con latidos normales y con pacientes distintos en entrenamiento y en prueba, para evitar fugas de datos.
+- **Ajuste fino por paciente:** con los primeros 50 latidos de cada paciente, el modelo se ajusta a él durante 15 épocas y el umbral se fija en el percentil 90 de su error.
+- **Detección:** a partir de ahí, un latido es anómalo si su error de predicción (MAE normalizado) supera ese umbral.
+- **Visualización:** un monitor hecho con matplotlib muestra la señal en tiempo real, el último latido y las anomalías detectadas.
+
+## Datos
+
+[MIT-BIH Arrhythmia Database](https://physionet.org/content/mitdb/1.0.0/), de PhysioNet, con licencia Open Data Commons Attribution v1.0. Tiene 48 registros de ECG de 30 minutos, con cada latido anotado por cardiólogos. `src/100.parquet` es el registro 100 y se incluye como ejemplo.
+
+> Moody GB, Mark RG. The impact of the MIT-BIH Arrhythmia Database. *IEEE Engineering in Medicine and Biology* 20(3):45-50 (2001).
+
+## Estructura
 
 ```
-big-data-final/
+deteccion-arritmias-ecg/
 ├── src/
-│   ├── test_sine_producer.py       # Producer: simulates real-time ECG via Kafka
-│   ├── test_sine_plotter.py        # Monitor: visualizes and detects arrhythmias in realtime
-│   ├── 100.parquet                 # Example data
-│   └── ... (other scripts or auxiliary files)
-├── models/
-│   ├── fade_ecg_model_base.pth     # Trained model
-│   ├── scaler_x.pkl                # Normalization parameters X
-│   └── scaler_y.pkl                # Normalization parameters Y
-└── README.md
+│   ├── test_sine_producer.py    # productor: envía la señal por Kafka
+│   ├── test_sine_plotter.py     # consumidor: detecta y muestra las anomalías
+│   └── 100.parquet              # registro de ejemplo
+└── models/
+    ├── fade_ecg_model_base.pth  # modelo base entrenado
+    ├── scaler_x.pkl             # normalización de la entrada
+    └── scaler_y.pkl             # normalización de la salida
 ```
 
-## 🚀 Usage Guide
+## Cómo ejecutarlo
 
-### 1. Configure Kafka (Local)
+1. Instala las dependencias:
 
-```bash
-# Start Zookeeper
-bin/zookeeper-server-start.sh config/zookeeper.properties
+   ```bash
+   pip install numpy pandas pyarrow matplotlib torch scikit-learn joblib kafka-python
+   ```
 
-# Start Kafka
-bin/kafka-server-start.sh config/server.properties
+2. Arranca Kafka en `localhost:9092` y crea el topic:
 
-# Create topic
-bin/kafka-topics.sh --create --topic ecg-raw-signal --bootstrap-server localhost:9092
-```
+   ```bash
+   bin/kafka-topics.sh --create --topic ecg-raw-signal --bootstrap-server localhost:9092
+   ```
 
-### 2. Run the System Scripts
+3. Desde la carpeta `src/`, en dos terminales, arranca primero el monitor y después el productor, porque el monitor solo lee los mensajes nuevos:
 
-Open two terminals in the project root folder and run the following commands:
+   ```bash
+   python test_sine_plotter.py    # terminal 1: detecta y muestra las anomalías
+   python test_sine_producer.py   # terminal 2: envía la señal
+   ```
 
-**Terminal 1 - Signal Producer (ECG simulation):**
-```bash
-cd src
-python test_sine_producer.py
-```
+## Autores
 
-**Terminal 2 - Monitor/Plotter (arrhythmia detection and visualization):**
-```bash
-cd src
-python test_sine_plotter.py
-```
-
-**Other scripts in `src/`**
-
-If you add new scripts for processing, analysis, or utilities, run them in the same way:
-```bash
-cd src
-python your_script_name.py
-```
-
-**Notes:**
-- Make sure you have the models and scalers in the `models/` folder with the correct names (`fade_ecg_model_base.pth`, `scaler_x.pkl`, `scaler_y.pkl`).
-- If you use additional data files, place them in the appropriate folder and adjust the paths in the scripts as needed.
-
-## 📊 Methodology
-
-### Data Leakage Prevention
-
-The project implements a **patient-level split** to avoid data leakage:
-
-- Training and test patients are completely different
-- The model never sees beats from the same patient in both train and test
-- This better reflects real-world performance on new patients
-
-### Anomaly Detection
-
-The system uses a **reconstruction-based** approach:
-
-1. The autoencoder is trained only with normal beats
-2. It learns to predict the future ECG pattern
-3. Anomalies produce higher reconstruction error
-4. A calibrated threshold classifies normal vs arrhythmia
-
-## 📚 Dependencies
-
-```
-numpy
-pandas
-matplotlib
-seaborn
-wfdb
-torch
-scikit-learn
-kafka-python
-pyarrow
-```
-
-## 👥 Authors
-
-Developed for the Big Data course - University
-
-## 📝 License
-
-This project is for educational purposes only.
+Diego Solsona y [gtognola](https://github.com/gtognola).

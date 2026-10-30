@@ -27,6 +27,9 @@ KAFKA_SERVER = "localhost:9092"
 # La ruta se resuelve relativa al directorio del script
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PARQUET_FILE = os.path.join(SCRIPT_DIR, "data", "individual_records", "patient_200.parquet")
+if not os.path.exists(PARQUET_FILE):
+    # Sin los datos que genera el cuaderno de entrenamiento, se usa el registro de ejemplo
+    PARQUET_FILE = os.path.join(SCRIPT_DIR, "100.parquet")
 
 # CONFIGURACIÓN DE STREAMING PUNTO A PUNTO
 FS = 360.0        # Frecuencia de muestreo (Hz) - MIT-BIH estándar
